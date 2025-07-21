@@ -1,97 +1,140 @@
 "use client"
 
-import { useState } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useState, useRef, useEffect } from "react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import Image from "next/image"
-import { QrCode } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
+import { Camera, Scan, XCircle } from "lucide-react"
 
 interface BarcodeScannerDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  onScan: (data: string) => void
-  scanType: "product" | "tracking"
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onScan: (scannedData: string) => void
+  scanType: "product" | "tracking" // New prop to differentiate scan type
 }
 
-export function BarcodeScannerDialog({ isOpen, onClose, onScan, scanType }: BarcodeScannerDialogProps) {
-  const [scannedData, setScannedData] = useState("")
-  const [showQrCode, setShowQrCode] = useState(false)
+export function BarcodeScannerDialog({ open, onOpenChange, onScan, scanType }: BarcodeScannerDialogProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [isScanning, setIsScanning] = useState(false)
+  const [cameraError, setCameraError] = useState<string | null>(null)
 
-  const handleShowQrCode = () => {
-    setShowQrCode(true)
-    // Simulate a scan based on type
+  const startCamera = async () => {
+    setCameraError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+        streamRef.current = stream
+        setIsScanning(true)
+        toast({
+          title: "Kamera Aktif",
+          description: `Arahkan kamera ke QR Code ${scanType === "product" ? "produk" : "resi pengiriman"}.`,
+        })
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err)
+      setCameraError(
+        "Tidak dapat mengakses kamera. Pastikan izin diberikan dan tidak ada aplikasi lain yang menggunakan kamera.",
+      )
+      toast({
+        title: "Gagal Mengakses Kamera",
+        description: "Pastikan izin kamera diberikan dan coba lagi.",
+        variant: "destructive",
+      })
+      setIsScanning(false)
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsScanning(false)
+    setCameraError(null)
+  }
+
+  // Simulate barcode detection (replace with actual barcode scanning library)
+  const simulateScan = () => {
+    if (!isScanning) return
+
+    let scannedData: string
     if (scanType === "product") {
-      setScannedData("PROD001") // Example product ID
+      const productIds = ["P001", "P002", "P003", "P004", "P005", "P006", "P007", "P008", "P009", "P010"]
+      scannedData = productIds[Math.floor(Math.random() * productIds.length)]
     } else {
-      setScannedData(
-        "TRK" +
-          Math.floor(Math.random() * 1000000000)
-            .toString()
-            .padStart(9, "0"),
-      ) // Example tracking number
+      // scanType === "tracking"
+      const trackingNumbers = ["INV-20250721-001", "INV-20250721-002", "INV-20250721-003", "INV-20250721-004"]
+      scannedData = trackingNumbers[Math.floor(Math.random() * trackingNumbers.length)]
     }
+
+    onScan(scannedData)
+    stopCamera()
+    onOpenChange(false) // Close dialog after scan
   }
 
-  const handleConfirm = () => {
-    if (scannedData) {
-      onScan(scannedData)
-      setScannedData("")
-      setShowQrCode(false)
+  useEffect(() => {
+    if (open) {
+      startCamera()
+    } else {
+      stopCamera()
     }
-  }
-
-  const handleCloseDialog = () => {
-    setScannedData("")
-    setShowQrCode(false)
-    onClose()
-  }
-
-  const dialogTitle = scanType === "product" ? "Scan Barcode Produk" : "Scan Nomor Resi Pengiriman"
-  const qrCodePlaceholder =
-    scanType === "product" ? "/placeholder.svg?height=200&width=200" : "/placeholder.svg?height=200&width=200"
+    return () => {
+      stopCamera()
+    }
+  }, [open])
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleCloseDialog}>
-      <DialogContent className="sm:max-w-[425px]">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{dialogTitle}</DialogTitle>
-          <DialogDescription>Gunakan kamera Anda untuk memindai barcode atau QR code.</DialogDescription>
+          <DialogTitle>Scan QR Code {scanType === "product" ? "Produk" : "Resi Pengiriman"}</DialogTitle>
+          <DialogDescription>
+            Arahkan kamera ke QR Code {scanType === "product" ? "produk" : "resi pengiriman"} untuk memindai.
+          </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="flex flex-col items-center justify-center h-48 border rounded-md bg-muted">
-            {showQrCode ? (
-              <Image
-                src={qrCodePlaceholder || "/placeholder.svg"}
-                alt="QR Code Placeholder"
-                width={200}
-                height={200}
-                className="object-contain"
-              />
-            ) : (
-              <p className="text-muted-foreground">Area Pemindai Kamera</p>
-            )}
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="scanned-data">Data Terdeteksi</Label>
-            <Input
-              id="scanned-data"
-              value={scannedData}
-              onChange={(e) => setScannedData(e.target.value)}
-              placeholder="Data barcode/QR akan muncul di sini"
-              readOnly={showQrCode} // Make it read-only when QR code is shown
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={handleShowQrCode}>
-              <QrCode className="mr-2 h-4 w-4" /> Tampilkan QR Code
-            </Button>
-            <Button onClick={handleConfirm} disabled={!scannedData}>
-              Konfirmasi
-            </Button>
-          </div>
+        <div className="relative w-full h-64 bg-gray-200 rounded-md overflow-hidden flex items-center justify-center">
+          {cameraError ? (
+            <div className="text-red-500 text-center p-4 flex flex-col items-center gap-2">
+              <XCircle className="h-8 w-8" />
+              {cameraError}
+              <Button onClick={startCamera} className="mt-2">
+                Coba Lagi
+              </Button>
+            </div>
+          ) : (
+            <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+          )}
+          {!isScanning && !cameraError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <Button onClick={startCamera}>
+                <Camera className="mr-2 h-4 w-4" />
+                Mulai Kamera
+              </Button>
+            </div>
+          )}
         </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Batal
+          </Button>
+          <Button onClick={simulateScan} disabled={!isScanning}>
+            <Scan className="mr-2 h-4 w-4" />
+            Simulasikan Scan
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )

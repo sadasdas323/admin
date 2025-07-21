@@ -21,8 +21,6 @@ import {
   ChevronDown,
   DollarSign,
   TrendingUp,
-  Database,
-  ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -199,20 +197,6 @@ export default function Sidebar() {
             label="Karyawan"
             href="/dashboard/employees"
             active={pathname.startsWith("/dashboard/employees")}
-          />
-          {/* New Master Data Link */}
-          <SidebarItem
-            icon={Database}
-            label="Master Data"
-            href="/dashboard/master-data"
-            active={pathname.startsWith("/dashboard/master-data")}
-          />
-          {/* New Access Control Link */}
-          <SidebarItem
-            icon={ShieldCheck}
-            label="Kontrol Akses"
-            href="/dashboard/access-control"
-            active={pathname.startsWith("/dashboard/access-control")}
           />
           <SidebarItem
             icon={Settings}
